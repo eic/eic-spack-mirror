@@ -71,6 +71,28 @@ jobs:
             echo "MIRROR_FAILURES=0" >> "$GITHUB_ENV"
           fi
 
+      - name: Remove large files from mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Find and remove files larger than 50MB to comply with GitHub's recommendations
+          echo "Searching for files larger than 50MB..."
+          large_files=$(find mirror -type f -size +50M 2>/dev/null || true)
+          
+          if [ -n "$large_files" ]; then
+            echo "Found large files that exceed GitHub's 50MB recommendation:"
+            echo "$large_files" | while read -r file; do
+              size=$(du -h "$file" | cut -f1)
+              echo "  - $file ($size)"
+            done
+            
+            echo "Removing large files..."
+            echo "$large_files" | xargs rm -f
+            echo "Large files removed successfully"
+          else
+            echo "No files larger than 50MB found"
+          fi
+
       - name: Commit mirror updates
         shell: bash
         run: |
