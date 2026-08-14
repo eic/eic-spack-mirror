@@ -1,0 +1,89 @@
+name: Update Spack Mirror
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout mirror repository
+        uses: actions/checkout@v4
+
+      - name: Setup Spack
+        uses: spack/setup-spack@v2
+        with:
+          spack_ref: develop
+          packages_ref: develop
+
+      - name: Checkout eic-spack repository
+        uses: actions/checkout@v4
+        with:
+          repository: eic/eic-spack
+          ref: develop
+          path: eic-spack
+
+      - name: Add eic-spack package repository
+        shell: bash
+        run: |
+          spack repo add "$GITHUB_WORKSPACE/eic-spack"
+
+      - name: Create mirror entries for eic-spack packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mirror
+
+          mapfile -t packages < <(
+            find "$GITHUB_WORKSPACE/eic-spack" -type f -path '*/packages/*/package.py' \
+              | sed -E 's|.*/packages/([^/]+)/package.py|\1|' \
+              | sort -u
+          )
+
+          if [ "${#packages[@]}" -eq 0 ]; then
+            echo "No packages found in eic-spack repository"
+            exit 1
+          fi
+
+          for pkg in "${packages[@]}"; do
+            echo "Mirroring ${pkg}"
+            spack mirror create --directory mirror --versions-per-spec 5 "$pkg"
+          done
+
+      - name: Commit mirror updates
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- mirror; then
+            echo "No mirror updates to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mirror
+          git commit -m "Update Spack mirror entries"
+          git push
+
+      - name: Upload mirror artifact for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: mirror
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: mirror
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
