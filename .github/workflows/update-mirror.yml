@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout mirror repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Spack
         uses: spack/setup-spack@v3
@@ -27,7 +27,7 @@ jobs:
           packages_ref: develop
 
       - name: Checkout eic-spack repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: eic/eic-spack
           ref: develop
