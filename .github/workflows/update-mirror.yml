@@ -77,17 +77,19 @@ jobs:
           set -euo pipefail
           # Find and remove files larger than 50MB to comply with GitHub's recommendations
           echo "Searching for files larger than 50MB..."
-          large_files=$(find mirror -type f -size +50M 2>/dev/null || true)
-          
-          if [ -n "$large_files" ]; then
-            echo "Found large files that exceed GitHub's 50MB recommendation:"
-            echo "$large_files" | while read -r file; do
-              size=$(du -h "$file" | cut -f1)
-              echo "  - $file ($size)"
-            done
-            
+          large_files_found=0
+          while IFS= read -r -d '' file; do
+            if [ "$large_files_found" -eq 0 ]; then
+              echo "Found large files that exceed GitHub's 50MB recommendation:"
+              large_files_found=1
+            fi
+            size=$(du -h -- "$file" | cut -f1)
+            echo "  - $file ($size)"
+          done < <(find mirror -type f -size +50M -print0 2>/dev/null)
+
+          if [ "$large_files_found" -eq 1 ]; then
             echo "Removing large files..."
-            echo "$large_files" | xargs rm -f
+            find mirror -type f -size +50M -print0 2>/dev/null | xargs -0 rm --
             echo "Large files removed successfully"
           else
             echo "No files larger than 50MB found"
