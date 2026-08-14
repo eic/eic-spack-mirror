@@ -71,13 +71,6 @@ jobs:
             echo "MIRROR_FAILURES=0" >> "$GITHUB_ENV"
           fi
 
-      - name: Fail on mirror creation errors
-        if: env.MIRROR_FAILURES == '1'
-        shell: bash
-        run: |
-          echo "Mirror creation had one or more package failures"
-          exit 1
-
       - name: Commit mirror updates
         shell: bash
         run: |
@@ -97,6 +90,13 @@ jobs:
           git add mirror
           git commit -m "Update Spack mirror entries"
           git push
+
+      - name: Fail on mirror creation errors
+        if: env.MIRROR_FAILURES == '1'
+        shell: bash
+        run: |
+          echo "Mirror creation had one or more package failures"
+          exit 1
 
       - name: Upload mirror artifact for Pages
         uses: actions/upload-pages-artifact@v3
