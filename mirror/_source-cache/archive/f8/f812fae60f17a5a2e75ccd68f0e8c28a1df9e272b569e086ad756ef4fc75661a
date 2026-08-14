@@ -1,0 +1,66 @@
+diff --git a/GaudiKernel/CMakeLists.txt b/GaudiKernel/CMakeLists.txt
+index a0c287857af8b6a29e24e7c6a9a3bbccdad5cb5f..e6b49262b1354f8b5a5204c90d5d4d9748cd1cc1 100644
+--- a/GaudiKernel/CMakeLists.txt
++++ b/GaudiKernel/CMakeLists.txt
+@@ -83,6 +83,7 @@ gaudi_add_library(GaudiKernel
+           src/Lib/Guards.cpp
+           src/Lib/HistoDef.cpp
+           src/Lib/HistoryObj.cpp
++          src/Lib/IAuditor.cpp
+           src/Lib/IConversionSvc.cpp
+           src/Lib/IDataProviderSvc.cpp
+           src/Lib/IInterface.cpp
+diff --git a/GaudiKernel/include/Gaudi/IAuditor.h b/GaudiKernel/include/Gaudi/IAuditor.h
+index 3299a007c0e0000f6f5371dbccf4d0c499fca6b7..8fbf4a37eb6bcc6ea23570e536eb424261775537 100644
+--- a/GaudiKernel/include/Gaudi/IAuditor.h
++++ b/GaudiKernel/include/Gaudi/IAuditor.h
+@@ -44,13 +44,13 @@ namespace Gaudi {
+     virtual StatusCode sysFinalize() = 0;
+ 
+     // Defining a set of standard events used internally by the framework
+-    inline static const std::string Initialize   = "Initialize";
+-    inline static const std::string ReInitialize = "ReInitialize";
+-    inline static const std::string Start        = "Start";
+-    inline static const std::string ReStart      = "ReStart";
+-    inline static const std::string Execute      = "Execute";
+-    inline static const std::string Stop         = "Stop";
+-    inline static const std::string Finalize     = "Finalize";
++    static const std::string Initialize;
++    static const std::string ReInitialize;
++    static const std::string Start;
++    static const std::string ReStart;
++    static const std::string Execute;
++    static const std::string Stop;
++    static const std::string Finalize;
+   };
+ 
+ } // namespace Gaudi
+diff --git a/GaudiKernel/src/Lib/IAuditor.cpp b/GaudiKernel/src/Lib/IAuditor.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae1b4b7f57281c07bcb037e5a3c667ad1f0df86a
+--- /dev/null
++++ b/GaudiKernel/src/Lib/IAuditor.cpp
+@@ -0,0 +1,23 @@
++/***********************************************************************************\
++* (c) Copyright 1998-2025 CERN for the benefit of the LHCb and ATLAS collaborations *
++*                                                                                   *
++* This software is distributed under the terms of the Apache version 2 licence,     *
++* copied verbatim in the file "COPYING".                                            *
++*                                                                                   *
++* In applying this licence, CERN does not waive the privileges and immunities       *
++* granted to it by virtue of its status as an Intergovernmental Organization        *
++* or submit itself to any jurisdiction.                                             *
++\***********************************************************************************/
++#include <Gaudi/IAuditor.h>
++
++namespace Gaudi {
++
++  const std::string IAuditor::Initialize   = "Initialize";
++  const std::string IAuditor::ReInitialize = "ReInitialize";
++  const std::string IAuditor::Start        = "Start";
++  const std::string IAuditor::ReStart      = "ReStart";
++  const std::string IAuditor::Execute      = "Execute";
++  const std::string IAuditor::Stop         = "Stop";
++  const std::string IAuditor::Finalize     = "Finalize";
++
++} // namespace Gaudi

@@ -1,0 +1,16 @@
+diff --git a/GaudiTestSuite/CMakeLists.txt b/GaudiTestSuite/CMakeLists.txt
+index 3207800958976efb250832db6d4cd8cbfd36ccf4..06bab9dba94572350aafa607f31d79da98c4057c 100644
+--- a/GaudiTestSuite/CMakeLists.txt
++++ b/GaudiTestSuite/CMakeLists.txt
+@@ -124,11 +124,6 @@ target_sources(GaudiTestSuiteComponents PRIVATE src/IO/ExamplesHandleAlgs.cpp)
+ add_library(GaudiExamplesLib ALIAS GaudiTestSuiteLib)
+ add_library(${PROJECT_NAME}::GaudiExamplesLib ALIAS GaudiTestSuiteLib)
+ 
+-if(NOT ROOT_VERSION VERSION_LESS "6.20")
+-  find_package(ROOT REQUIRED COMPONENTS ROOTHist)
+-  target_link_libraries(GaudiTestSuiteComponents PRIVATE ROOT::ROOTHist)
+-endif()
+-
+ if(GAUDI_USE_AIDA)
+     target_sources(GaudiTestSuiteComponents PRIVATE
+                                          src/Histograms/HistoAlgorithm.cpp
