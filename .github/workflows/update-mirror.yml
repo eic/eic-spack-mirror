@@ -36,7 +36,7 @@ jobs:
       - name: Add eic-spack package repository
         shell: bash
         run: |
-          spack repo add "$GITHUB_WORKSPACE/eic-spack"
+          spack repo add "$GITHUB_WORKSPACE/eic-spack/spack_repo/eic"
 
       - name: Create mirror entries for eic-spack packages
         shell: bash
