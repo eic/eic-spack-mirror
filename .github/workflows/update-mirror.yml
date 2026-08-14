@@ -58,7 +58,7 @@ jobs:
           failed_packages=()
           for pkg in "${packages[@]}"; do
             echo "Mirroring ${pkg}"
-            if ! spack mirror create --directory mirror --versions-per-spec 5 "$pkg"; then
+            if ! spack mirror create --directory mirror --versions-per-spec 5 --skip-unstable-versions "$pkg"; then
               echo "Failed to mirror ${pkg}"
               failed_packages+=("$pkg")
             fi
