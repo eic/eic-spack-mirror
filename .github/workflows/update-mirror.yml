@@ -51,18 +51,17 @@ jobs:
             exit 1
           fi
 
-          failed=0
+          failed_packages=()
           for pkg in "${packages[@]}"; do
             echo "Mirroring ${pkg}"
             if ! spack mirror create --directory mirror --versions-per-spec 5 "$pkg"; then
               echo "Failed to mirror ${pkg}"
-              failed=1
+              failed_packages+=("$pkg")
             fi
           done
 
-          if [ "$failed" -ne 0 ]; then
-            echo "One or more packages failed to mirror"
-            exit 1
+          if [ "${#failed_packages[@]}" -ne 0 ]; then
+            echo "One or more packages failed to mirror: ${failed_packages[*]}"
           fi
 
       - name: Commit mirror updates
