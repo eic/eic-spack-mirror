@@ -1,6 +1,8 @@
 name: Update Spack Mirror
 
 on:
+  schedule:
+    - cron: '37 16 * * *'
   workflow_dispatch:
 
 concurrency:
