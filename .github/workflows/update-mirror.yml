@@ -102,6 +102,28 @@ jobs:
             echo "No files larger than 50MB found"
           fi
 
+      - name: Remove dangling symlinks from mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Searching for dangling symlinks..."
+          dangling_found=0
+          while IFS= read -r -d '' link; do
+            if [ "$dangling_found" -eq 0 ]; then
+              echo "Found dangling symlinks:"
+              dangling_found=1
+            fi
+            echo "  - $link"
+          done < <(find mirror -xtype l -print0 2>/dev/null)
+
+          if [ "$dangling_found" -eq 1 ]; then
+            echo "Removing dangling symlinks..."
+            find mirror -xtype l -print0 2>/dev/null | xargs -0 rm --
+            echo "Dangling symlinks removed successfully"
+          else
+            echo "No dangling symlinks found"
+          fi
+
       - name: Commit mirror updates
         shell: bash
         run: |
