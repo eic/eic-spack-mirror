@@ -1,6 +1,9 @@
 name: Update Spack Mirror
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '37 16 * * *'
   workflow_dispatch:
