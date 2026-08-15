@@ -71,11 +71,9 @@ jobs:
             fi
           done
 
+          echo "MIRROR_FAILURES=${#failed_packages[@]}" >> "$GITHUB_ENV"
           if [ "${#failed_packages[@]}" -ne 0 ]; then
-            echo "One or more packages failed to mirror: ${failed_packages[*]}"
-            echo "MIRROR_FAILURES=1" >> "$GITHUB_ENV"
-          else
-            echo "MIRROR_FAILURES=0" >> "$GITHUB_ENV"
+            echo "Packages failed to mirror: ${failed_packages[*]}"
           fi
 
       - name: Remove large files from mirror
@@ -150,10 +148,10 @@ jobs:
           path: mirror
 
       - name: Fail on mirror creation errors
-        if: env.MIRROR_FAILURES == '1'
+        if: env.MIRROR_FAILURES > 1
         shell: bash
         run: |
-          echo "Mirror creation had one or more package failures"
+          echo "Mirror creation had ${MIRROR_FAILURES} package failures (more than 1 allowed)"
           exit 1
 
   deploy:
