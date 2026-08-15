@@ -148,7 +148,7 @@ jobs:
           path: mirror
 
       - name: Fail on mirror creation errors
-        if: env.MIRROR_FAILURES > 1
+        if: fromJSON(env.MIRROR_FAILURES) > 1
         shell: bash
         run: |
           echo "Mirror creation had ${MIRROR_FAILURES} package failures (more than 1 allowed)"
