@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '_source-cache/**'
+      - 'mirror/**'
   schedule:
     - cron: '37 16 * * *'
   workflow_dispatch:
