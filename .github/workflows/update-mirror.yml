@@ -22,6 +22,8 @@ permissions:
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    outputs:
+      pages_artifact_uploaded: ${{ steps.upload-pages-artifact.outcome }}
 
     steps:
       - name: Checkout mirror repository
@@ -142,8 +144,20 @@ jobs:
           git commit -m "Update Spack mirror entries"
           git push
 
-      - name: Upload mirror artifact for Pages
+      - name: Check mirror directory is non-empty
         if: always()
+        id: check-mirror
+        shell: bash
+        run: |
+          if [ -n "$(find mirror -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload mirror artifact for Pages
+        if: always() && steps.check-mirror.outputs.has_files == 'true'
+        id: upload-pages-artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: mirror
@@ -158,7 +172,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: mirror
-    if: always()
+    if: always() && needs.mirror.result != 'cancelled' && needs.mirror.outputs.pages_artifact_uploaded == 'success'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
