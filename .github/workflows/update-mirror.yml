@@ -149,17 +149,27 @@ jobs:
         run: |
           set -euo pipefail
 
+          html_escape() {
+            local s="$1"
+            s="${s//&/&amp;}"
+            s="${s//</&lt;}"
+            s="${s//>/&gt;}"
+            s="${s//\"/&quot;}"
+            echo "$s"
+          }
+
           generate_index() {
-            local dir="$1"
-            local rel="${dir#mirror}"
-            rel="${rel:-/}"
+            local dir="$1" mirror_root="$2"
+            local abs_dir
+            abs_dir="$(realpath "$dir")"
+            local rel="/${abs_dir#"${mirror_root}"}"
 
             {
               echo '<!DOCTYPE html>'
               echo '<html>'
               echo '<head>'
               echo "  <meta charset=\"utf-8\">"
-              echo "  <title>EIC Spack Mirror${rel}</title>"
+              echo "  <title>EIC Spack Mirror$(html_escape "$rel")</title>"
               echo '  <style>'
               echo '    body { font-family: monospace; padding: 1em; }'
               echo '    a { text-decoration: none; }'
@@ -168,7 +178,7 @@ jobs:
               echo '  </style>'
               echo '</head>'
               echo '<body>'
-              echo "  <h1>EIC Spack Mirror: ${rel}</h1>"
+              echo "  <h1>EIC Spack Mirror: $(html_escape "$rel")</h1>"
               if [ "$rel" != "/" ]; then
                 echo '  <p><a href="../">&#x2190; Parent directory</a></p>'
               fi
@@ -177,14 +187,14 @@ jobs:
               # List subdirectories first
               while IFS= read -r -d '' entry; do
                 name="$(basename "$entry")"
-                echo "    <li><a href=\"${name}/\">📁 ${name}/</a></li>"
+                echo "    <li><a href=\"$(html_escape "$name")/\">📁 $(html_escape "$name")/</a></li>"
               done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 
               # List files and symlinks to files
               while IFS= read -r -d '' entry; do
                 name="$(basename "$entry")"
-                size="$(du -Lh -- "$entry" 2>/dev/null | cut -f1 || echo '?')"
-                echo "    <li><a href=\"${name}\">📦 ${name}</a> (${size})</li>"
+                size="$({ du -Lh -- "$entry" 2>/dev/null || echo '?'; } | cut -f1)"
+                echo "    <li><a href=\"$(html_escape "$name")\">📦 $(html_escape "$name")</a> (${size})</li>"
               done < <(find "$dir" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) -not -name 'index.html' -print0 | sort -z)
 
               echo '  </ul>'
@@ -194,8 +204,9 @@ jobs:
           }
 
           # Generate index for all directories recursively
+          mirror_root="$(realpath mirror)"
           while IFS= read -r -d '' d; do
-            generate_index "$d"
+            generate_index "$d" "$mirror_root"
           done < <(find mirror -type d -print0 | sort -z)
 
           echo "Index pages generated successfully"
