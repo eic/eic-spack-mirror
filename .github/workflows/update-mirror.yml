@@ -144,6 +144,73 @@ jobs:
           git commit -m "Update Spack mirror entries"
           git push
 
+      - name: Generate index pages for mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          html_escape() {
+            local s="$1"
+            s="${s//&/&amp;}"
+            s="${s//</&lt;}"
+            s="${s//>/&gt;}"
+            s="${s//\"/&quot;}"
+            echo "$s"
+          }
+
+          generate_index() {
+            local dir="$1" mirror_root="$2"
+            local abs_dir
+            abs_dir="$(realpath "$dir")"
+            local rel="/${abs_dir#"${mirror_root}"}"
+
+            {
+              echo '<!DOCTYPE html>'
+              echo '<html>'
+              echo '<head>'
+              echo "  <meta charset=\"utf-8\">"
+              echo "  <title>EIC Spack Mirror$(html_escape "$rel")</title>"
+              echo '  <style>'
+              echo '    body { font-family: monospace; padding: 1em; }'
+              echo '    a { text-decoration: none; }'
+              echo '    a:hover { text-decoration: underline; }'
+              echo '    li { padding: 2px 0; }'
+              echo '  </style>'
+              echo '</head>'
+              echo '<body>'
+              echo "  <h1>EIC Spack Mirror: $(html_escape "$rel")</h1>"
+              if [ "$rel" != "/" ]; then
+                echo '  <p><a href="../">&#x2190; Parent directory</a></p>'
+              fi
+              echo '  <ul>'
+
+              # List subdirectories first
+              while IFS= read -r -d '' entry; do
+                name="$(basename "$entry")"
+                echo "    <li><a href=\"$(html_escape "$name")/\">📁 $(html_escape "$name")/</a></li>"
+              done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+
+              # List files and symlinks to files
+              while IFS= read -r -d '' entry; do
+                name="$(basename "$entry")"
+                size="$({ du -Lh --apparent-size -- "$entry" 2>/dev/null || echo '?'; } | cut -f1)"
+                echo "    <li><a href=\"$(html_escape "$name")\">📦 $(html_escape "$name")</a> (${size})</li>"
+              done < <(find "$dir" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) -not -name 'index.html' -print0 | sort -z)
+
+              echo '  </ul>'
+              echo '</body>'
+              echo '</html>'
+            } > "$dir/index.html"
+          }
+
+          # Generate index for all directories recursively
+          mirror_root="$(realpath mirror)"
+          while IFS= read -r -d '' d; do
+            generate_index "$d" "$mirror_root"
+          done < <(find mirror -type d -print0 | sort -z)
+
+          echo "Index pages generated successfully"
+
       - name: Check mirror directory is non-empty
         if: always()
         id: check-mirror
