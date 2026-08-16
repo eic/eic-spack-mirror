@@ -143,6 +143,7 @@ jobs:
           git push
 
       - name: Upload mirror artifact for Pages
+        if: always()
         uses: actions/upload-pages-artifact@v5
         with:
           path: mirror
@@ -157,7 +158,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: mirror
-    if: ${{ needs.mirror.result == 'success' || needs.mirror.result == 'failure' }}
+    if: always()
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
