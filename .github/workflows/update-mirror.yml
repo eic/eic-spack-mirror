@@ -78,9 +78,23 @@ jobs:
             exit 1
           fi
 
-          # Workaround for spack mirror create --versions-per-spec: the additional versions inherit
-          # the version-specific commit= and patches= variants of the newest version, which makes
-          # concretization fail. Mirror the newest versions one at a time instead.
+          # Mirror the newest versions one at a time instead of using --versions-per-spec: with
+          # the latter, the additional versions inherit the version-specific commit= and patches=
+          # variants of the newest version, which makes concretization fail.
+          # Whether mirror/<pkg>/<pkg>-<version>.<archive extension> exists. The extension must be
+          # matched exactly: a version 1.0 is not mirrored by the presence of a 1.0.1 archive.
+          is_mirrored() {
+            local pkg=$1 version=$2 file suffix
+            for file in "mirror/${pkg}/${pkg}-${version}"*; do
+              [ -e "$file" ] || continue
+              suffix=${file#"mirror/${pkg}/${pkg}-${version}"}
+              if [[ "$suffix" =~ ^(\.tar\.(gz|bz2|xz|zst|lz|Z)|\.(tgz|tbz2|tbz|txz|tar|zip|gz|bz2|xz|jar|whl))?$ ]]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
           mirror_by_version() {
             local pkg=$1 version rc=0
             local -a versions
@@ -90,6 +104,10 @@ jobs:
               return 1
             fi
             for version in "${versions[@]}"; do
+              if is_mirrored "$pkg" "$version"; then
+                echo "Skipping ${pkg}@=${version}, already mirrored"
+                continue
+              fi
               echo "Mirroring ${pkg}@=${version}"
               if ! spack mirror create --directory mirror --skip-unstable-versions "${pkg}@=${version}"; then
                 echo "Failed to mirror ${pkg}@=${version}"
@@ -102,12 +120,9 @@ jobs:
           failed_packages=()
           for pkg in "${packages[@]}"; do
             echo "Mirroring ${pkg}"
-            if ! spack mirror create --directory mirror --versions-per-spec 5 --skip-unstable-versions "$pkg"; then
-              echo "Retrying ${pkg} one version at a time"
-              if ! mirror_by_version "$pkg"; then
-                echo "Failed to mirror ${pkg}"
-                failed_packages+=("$pkg")
-              fi
+            if ! mirror_by_version "$pkg"; then
+              echo "Failed to mirror ${pkg}"
+              failed_packages+=("$pkg")
             fi
           done
 
