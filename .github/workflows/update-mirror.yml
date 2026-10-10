@@ -78,12 +78,36 @@ jobs:
             exit 1
           fi
 
+          # Workaround for spack mirror create --versions-per-spec: the additional versions inherit
+          # the version-specific commit= and patches= variants of the newest version, which makes
+          # concretization fail. Mirror the newest versions one at a time instead.
+          mirror_by_version() {
+            local pkg=$1 version rc=0
+            local -a versions
+            mapfile -t versions < <(spack versions --safe "$pkg" | awk 'NF && NR <= 5 {print $1}')
+            if [ "${#versions[@]}" -eq 0 ]; then
+              echo "No versions found for ${pkg}"
+              return 1
+            fi
+            for version in "${versions[@]}"; do
+              echo "Mirroring ${pkg}@=${version}"
+              if ! spack mirror create --directory mirror --skip-unstable-versions "${pkg}@=${version}"; then
+                echo "Failed to mirror ${pkg}@=${version}"
+                rc=1
+              fi
+            done
+            return "$rc"
+          }
+
           failed_packages=()
           for pkg in "${packages[@]}"; do
             echo "Mirroring ${pkg}"
             if ! spack mirror create --directory mirror --versions-per-spec 5 --skip-unstable-versions "$pkg"; then
-              echo "Failed to mirror ${pkg}"
-              failed_packages+=("$pkg")
+              echo "Retrying ${pkg} one version at a time"
+              if ! mirror_by_version "$pkg"; then
+                echo "Failed to mirror ${pkg}"
+                failed_packages+=("$pkg")
+              fi
             fi
           done
 
