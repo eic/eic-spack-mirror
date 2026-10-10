@@ -56,6 +56,7 @@ jobs:
           mapfile -t packages < <(
             find "$GITHUB_WORKSPACE/eic-spack" -type f -path '*/packages/*/package.py' \
               | sed -E 's|.*/packages/([^/]+)/package.py|\1|' \
+              | tr '_' '-' \
               | sort -u
           )
 
