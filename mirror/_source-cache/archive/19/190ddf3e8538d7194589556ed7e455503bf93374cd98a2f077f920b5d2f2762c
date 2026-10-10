@@ -1,0 +1,256 @@
+diff --git a/DDDigi/CMakeLists.txt b/DDDigi/CMakeLists.txt
+index 6de971604b7a29d1849e19add188d6c25ac8c106..d5474dba3d2eeb392d673e706c1ebcfefaeeca33 100644
+--- a/DDDigi/CMakeLists.txt
++++ b/DDDigi/CMakeLists.txt
+@@ -69,7 +69,11 @@ endif()
+ if(DD4HEP_USE_EDM4HEP)
+   list(APPEND DDDigiIO_SOURCES      "io/DigiEdm4hepOutput.cpp;io/DigiEdm4hepInput.cpp")
+   list(APPEND DDDigiIO_DEFINITIONS  "DD4HEP_USE_EDM4HEP=1")
+-  list(APPEND DDDigiIO_USES         "EDM4HEP::edm4hep;EDM4HEP::edm4hepDict;podio::podio;podio::podioDict;podio::podioRootIO")
++  if(podio_VERSION VERSION_GREATER_EQUAL "1.0.0")
++    list(APPEND DDDigiIO_USES       "EDM4HEP::edm4hep;EDM4HEP::edm4hepDict;podio::podio;podio::podioDict;podio::podioIO")
++  else()
++    list(APPEND DDDigiIO_USES       "EDM4HEP::edm4hep;EDM4HEP::edm4hepDict;podio::podio;podio::podioDict;podio::podioRootIO")
++  endif()
+ else()
+   dd4hep_print( "|++> EDM4HEP not used. DDDigi will not be able to write EDM4HEP output.")
+ endif()
+diff --git a/DDDigi/io/DigiEdm4hepInput.cpp b/DDDigi/io/DigiEdm4hepInput.cpp
+index 45f2acd4de2e2db2c04c014831d008009a3f5b1e..3388c2ef9932b00c76d95ea4da1a92247b50f9b3 100644
+--- a/DDDigi/io/DigiEdm4hepInput.cpp
++++ b/DDDigi/io/DigiEdm4hepInput.cpp
+@@ -17,7 +17,9 @@
+ 
+ // podio/edm4hep include files
+ #include <podio/podioVersion.h>
+-#if PODIO_BUILD_VERSION >= PODIO_VERSION(0, 99, 0)
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++#include <podio/Reader.h>
++#elif PODIO_BUILD_VERSION >= PODIO_VERSION(0, 99, 0)
+ #include <podio/ROOTReader.h>
+ #else
+ #include <podio/ROOTFrameReader.h>
+@@ -54,8 +56,12 @@ namespace dd4hep {
+       edm4hep_read_frame_t(podio::Frame&& frm) : frame(std::move(frm)) { }
+       const podio::CollectionBase* get(const std::string& nam) const { return frame.get(nam); }
+     };
+-    
++
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++    using reader_t = podio::Reader;
++#else
+     using reader_t = podio::ROOTReader;
++#endif
+     using frame_t  = edm4hep_read_frame_t;
+ 
+     /// EDM4HEP Digi input reader: Collection descriptor definition
+@@ -127,12 +133,18 @@ namespace dd4hep {
+       }
+       /// Access the next data frame in the input sequence
+       std::shared_ptr<frame_t> next()   {
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++	auto data = stream->readNextFrame(section);
++	++entry;
++	return std::make_shared<frame_t>(std::move(data));
++#else
+ 	auto data = stream->readNextEntry(section);
+ 	if ( data )   {
+ 	  ++entry;
+ 	  return std::make_shared<frame_t>(std::move(data));
+ 	}
+ 	return {};
++#endif
+       }
+     };
+ 
+@@ -171,10 +183,14 @@ namespace dd4hep {
+       if ( inputs.empty() ) m_curr_input = 0;
+       while ( (m_curr_input+1) < len )   {
+ 	const auto& fname = inputs[++m_curr_input];
+-	auto stream = std::make_unique<reader_t>();
+ 	try  {
+ 	  auto sec = parent->input_section();
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++	  auto stream = std::make_unique<reader_t>(podio::makeReader(fname));
++#else
++	  auto stream = std::make_unique<reader_t>();
+ 	  stream->openFile(fname);
++#endif
+ 	  auto source = std::make_unique<source_t>(sec, std::move(stream));
+ 	  parent->info("+++ Opened EDM4HEP input file %s.", fname.c_str());
+ 	  parent->onOpenFile(*source);
+diff --git a/DDDigi/io/DigiEdm4hepOutput.cpp b/DDDigi/io/DigiEdm4hepOutput.cpp
+index 591f3432419cfd37f9f4b7d6340e17326b3d57a6..487ddc5f0d40e04d235e98a0e22e0be5135001b4 100644
+--- a/DDDigi/io/DigiEdm4hepOutput.cpp
++++ b/DDDigi/io/DigiEdm4hepOutput.cpp
+@@ -19,9 +19,11 @@
+ #include "DigiEdm4hepOutput.h"
+ #include "DigiIO.h"
+ 
+-/// edm4hep include files
++/// podio include files
+ #include <podio/podioVersion.h>
+-#if PODIO_BUILD_VERSION >= PODIO_VERSION(0, 99, 0)
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++#include <podio/Writer.h>
++#elif PODIO_BUILD_VERSION >= PODIO_VERSION(0, 99, 0)
+ #include <podio/ROOTWriter.h>
+ #else
+ #include <podio/ROOTFrameWriter.h>
+@@ -43,6 +45,12 @@ namespace dd4hep {
+   /// Namespace for the Digitization part of the AIDA detector description toolkit
+   namespace digi {
+ 
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++    using writer_t = podio::Writer;
++#else
++    using writer_t = podio::ROOTWriter;
++#endif
++
+     /// Helper class to create output in edm4hep format
+     /** Helper class to create output in edm4hep format
+      *
+@@ -56,7 +64,7 @@ namespace dd4hep {
+       using headercollection_t   = std::pair<std::string,std::unique_ptr<edm4hep::EventHeaderCollection> >;
+       DigiEdm4hepOutput*                      m_parent    { nullptr };
+       /// Reference to podio writer
+-      std::unique_ptr<podio::ROOTWriter>      m_writer    { };
++      std::unique_ptr<writer_t>               m_writer    { };
+       /// edm4hep event header collection
+       headercollection_t                      m_header    { };
+       /// MC particle collection
+@@ -196,7 +204,11 @@ namespace dd4hep {
+       clear();
+       m_writer.reset();
+       std::string fname = m_parent->next_stream_name();
+-      m_writer = std::make_unique<podio::ROOTWriter>(fname);
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++      m_writer = std::make_unique<writer_t>(podio::makeWriter(fname));
++#else
++      m_writer = std::make_unique<writer_t>(fname);
++#endif
+       m_parent->info("+++ Opened EDM4HEP output file %s", fname.c_str());
+     }
+ 
+diff --git a/DDG4/CMakeLists.txt b/DDG4/CMakeLists.txt
+index bf18803ae0562c4b3b140d20258a1f4e3c48511f..479ada0afa07e4bd97c034bae35f6fbbdfe6c6d6 100644
+--- a/DDG4/CMakeLists.txt
++++ b/DDG4/CMakeLists.txt
+@@ -112,9 +112,14 @@ IF(TARGET LCIO::lcio)
+ ENDIF()
+ 
+ IF(TARGET EDM4HEP::edm4hep)
++  if(podio_VERSION VERSION_GREATER_EQUAL "1.0.0")
++    set(DDG4_PODIO_IO_TARGET podio::podioIO)
++  else()
++    set(DDG4_PODIO_IO_TARGET podio::podioRootIO)
++  endif()
+   dd4hep_add_plugin(DDG4EDM4HEP
+     SOURCES edm4hep/Geant4Output2EDM4hep.cpp
+-    USES    DD4hep::DDG4 EDM4HEP::edm4hep EDM4HEP::edm4hepDict podio::podio podio::podioDict podio::podioRootIO
++    USES    DD4hep::DDG4 EDM4HEP::edm4hep EDM4HEP::edm4hepDict podio::podio podio::podioDict ${DDG4_PODIO_IO_TARGET}
+     )
+   set_target_properties(DDG4EDM4HEP PROPERTIES VERSION ${DD4hep_VERSION} SOVERSION ${DD4hep_SOVERSION})
+   if(TARGET podio::podioIO)
+diff --git a/DDG4/edm4hep/Geant4Output2EDM4hep.cpp b/DDG4/edm4hep/Geant4Output2EDM4hep.cpp
+index a13a308b45f38faa22a937fd55a65e9ba7457c70..bd2ebaf8351701509f2f9ddeb992329fda6c586d 100644
+--- a/DDG4/edm4hep/Geant4Output2EDM4hep.cpp
++++ b/DDG4/edm4hep/Geant4Output2EDM4hep.cpp
+@@ -41,6 +41,9 @@
+ #include <podio/podioVersion.h>
+ #include <podio/Frame.h>
+ #include <podio/FrameCategories.h>
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++#include <podio/Writer.h>
++#else
+ #if PODIO_BUILD_VERSION >= PODIO_VERSION(0, 99, 0)
+ #include <podio/ROOTWriter.h>
+ #else
+@@ -49,6 +52,7 @@ namespace podio {
+   using ROOTWriter = podio::ROOTFrameWriter;
+ }
+ #endif
++#endif
+ 
+ #include <atomic>
+ 
+@@ -70,7 +74,11 @@ namespace dd4hep {
+      */
+     class Geant4Output2EDM4hep : public Geant4OutputAction  {
+     protected:
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++      using writer_t = podio::Writer;
++#else
+       using writer_t = podio::ROOTWriter;
++#endif
+       using floatmap_t = std::map< std::string, float >;
+       using intmap_t = std::map< std::string, int >;
+       using stringmap_t = std::map< std::string, std::string >;
+@@ -97,6 +105,7 @@ namespace dd4hep {
+       int                           m_eventNo           { 0 };
+       int                           m_eventNumberOffset { 0 };
+       bool                          m_filesByRun        { false };
++      bool                          m_rntuple           { false };
+ 
+       /// Data conversion interface for MC particles to EDM4hep format
+       void saveParticles(Geant4ParticleMap* particles);
+@@ -265,6 +274,8 @@ Geant4Output2EDM4hep::Geant4Output2EDM4hep(Geant4Context* ctxt, const std::strin
+   declareProperty("EventNumberOffset",     m_eventNumberOffset);
+   declareProperty("SectionName",           m_section_name);
+   declareProperty("FilesByRun",            m_filesByRun);
++  declareProperty("RNTuple",               m_rntuple);
++
+   info("Writer is now instantiated ..." );
+   InstanceCount::increment(this);
+ }
+@@ -288,7 +299,11 @@ void Geant4Output2EDM4hep::beginRun(const G4Run* run)  {
+   }
+   // Create the file only when it has not yet beeen created in another thread
+   if ( !fname.empty() && !m_file )   {
++#if PODIO_BUILD_VERSION >= PODIO_VERSION(1, 0, 0)
++    m_file = std::make_unique<podio::Writer>(podio::makeWriter(fname, m_rntuple ? "rntuple" : "default"));
++#else
+     m_file = std::make_unique<podio::ROOTWriter>(fname);
++#endif
+     if ( !m_file )   {
+       fatal("+++ Failed to open output file: %s", fname.c_str());
+     }
+diff --git a/DDG4/python/DDSim/Helper/OutputConfig.py b/DDG4/python/DDSim/Helper/OutputConfig.py
+index b55193221e2dd77478f6faef4ddefc66f93ac631..5ee77c2ec1f1518dc1351f04fef4173140094172 100644
+--- a/DDG4/python/DDSim/Helper/OutputConfig.py
++++ b/DDG4/python/DDSim/Helper/OutputConfig.py
+@@ -26,6 +26,7 @@ def __init__(self):
+     self._forceLCIO = False
+     self._forceEDM4HEP = False
+     self._forceDD4HEP = False
++    self._useRNTuple = False
+     # no closeProperties, allow custom ones for userPlugin configuration
+ 
+   def _checkConsistency(self):
+@@ -71,6 +72,15 @@ def forceDD4HEP(self, val):
+     if self._forceDD4HEP:
+       self._checkConsistency()
+ 
++  @property
++  def useRNTuple(self):
++    """Use RNTuple backend for EDM4HEP output (requires podio with RNTuple support)."""
++    return self._useRNTuple
++
++  @useRNTuple.setter
++  def useRNTuple(self, val):
++    self._useRNTuple = self.makeBool(val)
++
+   @property
+   def userOutputPlugin(self):
+     """Set a function to configure the outputFile.
+@@ -149,8 +159,9 @@ def _configureLCIO(self, dds, geant4):
+     return
+ 
+   def _configureEDM4HEP(self, dds, geant4):
+-    logger.info("++++ Setting up EDM4hep ROOT Output ++++")
++    logger.info("++++ Setting up EDM4hep %s Output ++++", "RNTuple" if self.useRNTuple else "ROOT::TTree")
+     e4Out = geant4.setupEDM4hepOutput('EDM4hepOutput', dds.outputFile)
++    e4Out.RNTuple = self.useRNTuple
+     eventPars = dds.meta.parseMetaParameters()
+     e4Out.RunHeader = dds.meta.addParametersToRunHeader(dds)
+     e4Out.EventParametersString, e4Out.EventParametersInt, e4Out.EventParametersFloat = eventPars

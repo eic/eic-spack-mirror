@@ -1,0 +1,64 @@
+From 341033847eb1490326a244eeca8d543650e352ce Mon Sep 17 00:00:00 2001
+From: Nathan Brei <nbrei@jlab.org>
+Date: Thu, 26 Mar 2026 15:35:44 -0400
+Subject: [PATCH] Add BUILD_EXAMPLES and BUILD_TESTS CMake flags
+
+This lets downstream users turn off the tutorials/examples and tests. Addresses issue #489
+---
+ CMakeLists.txt | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f3bdb38ed643d4223b083419a8d65350adb2846c..b8b7462a6b3758fc6893911560555d5cd63f29f7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -69,6 +69,8 @@ option(USE_TSAN "Compile with thread sanitizer" OFF)
+ option(USE_CUDA "Compile CUDA-involved examples (Needed for examples/SubeventCUDAExample)." OFF)
+ option(USE_PODIO "Compile with PODIO support" OFF)
+ option(BUILD_SHARED_LIBS "Build into both shared and static libs." ON)
++option(BUILD_EXAMPLES "Build and install examples" ON)
++option(BUILD_TESTS "Build and install tests" ON)
+ 
+ if (${USE_PODIO})
+     find_package(podio REQUIRED)
+@@ -186,6 +188,16 @@ if (${BUILD_SHARED_LIBS})
+ else()
+     message(STATUS "BUILD_SHARED_LIBS    Off")
+ endif()
++if (${BUILD_EXAMPLES})
++    message(STATUS "BUILD_EXAMPLES       On")
++else()
++    message(STATUS "BUILD_EXAMPLES       Off")
++endif()
++if (${BUILD_TESTS})
++    message(STATUS "BUILD_TESTS          On")
++else()
++    message(STATUS "BUILD_TESTS          Off")
++endif()
+ message(STATUS "-----------------------")
+ 
+ #---------
+@@ -206,13 +218,20 @@ include(cmake/AddJanaTest.cmake)
+ 
+ add_subdirectory(src/external)
+ add_subdirectory(src/libraries/JANA)
+-add_subdirectory(src/examples)
+ add_subdirectory(src/plugins)
+ add_subdirectory(src/programs/jana)
+-add_subdirectory(src/programs/unit_tests)
+-add_subdirectory(src/programs/perf_tests)
+ add_subdirectory(src/python)
+ 
++if (${BUILD_EXAMPLES})
++    add_subdirectory(src/examples)
++endif()
++
++if (${BUILD_TESTS})
++    add_subdirectory(src/programs/unit_tests)
++    add_subdirectory(src/programs/perf_tests)
++endif()
++
++
+ #---------------------------------------------------------------------------------------
+ 
+ install(DIRECTORY scripts/ DESTINATION bin FILES_MATCHING PATTERN "jana-*.py"

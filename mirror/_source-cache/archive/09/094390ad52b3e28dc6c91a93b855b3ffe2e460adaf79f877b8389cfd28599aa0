@@ -1,0 +1,24 @@
+From ee1b1d550802ad9579a8c64d6a63903c7adbb06d Mon Sep 17 00:00:00 2001
+From: Wouter Deconinck <wdconinc@gmail.com>
+Date: Sat, 7 Mar 2026 15:13:49 -0600
+Subject: [PATCH] fix: ensure _from_zigzag applies bit shift on unsigned
+ integers
+
+---
+ src/uproot/models/RNTuple.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/uproot/models/RNTuple.py b/src/uproot/models/RNTuple.py
+index f437cd6b5ca34c9f1667b1d8342ca3f8e514a18d..7f8b45f5924e111b1cd4cb9eb951b2837f6344b6 100644
+--- a/src/uproot/models/RNTuple.py
++++ b/src/uproot/models/RNTuple.py
+@@ -73,7 +73,8 @@
+ 
+ 
+ def _from_zigzag(n):
+-    return n >> 1 ^ -(n & 1)
++    u = n.view(numpy.dtype(f"uint{n.dtype.itemsize * 8}"))
++    return ((u >> 1) ^ -(u & 1)).view(n.dtype)
+ 
+ 
+ def _envelop_header(chunk, cursor, context):

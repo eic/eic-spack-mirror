@@ -1,0 +1,53 @@
+From 12a4097509260c6097f8f6f1bdf1c9e5720c8924 Mon Sep 17 00:00:00 2001
+From: "Patrick J. LoPresti" <lopresti@gmail.com>
+Date: Thu, 3 Apr 2025 10:24:37 -0700
+Subject: [PATCH 1/2] Remove ambiguous inherited constructor in
+ default_quant_params.cc. GCC complains about this
+ (https://stackoverflow.com/q/79553477/). Fix is trivial and harmless.
+
+Fixes #84977.
+---
+ .../compiler/mlir/lite/transforms/default_quant_params.cc     | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc b/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
+index f1b602a6763aca30e9fc45da6c3aaab33a1cb394..7acbb7d17240b8a0e25dcb03aabc4d0153907530 100644
+--- a/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
++++ b/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
+@@ -54,7 +54,9 @@ namespace {
+ class DefaultQuantParamsPass
+     : public impl::DefaultQuantParamsPassBase<DefaultQuantParamsPass> {
+  public:
+-  using DefaultQuantParamsPassBase::DefaultQuantParamsPassBase;
++  DefaultQuantParamsPass()
++  {
++  }
+ 
+   explicit DefaultQuantParamsPass(double default_min, double default_max,
+                                   bool is_signed) {
+
+From 9385bc36c06e8a2cbe07d0a0730fcc32108d77f0 Mon Sep 17 00:00:00 2001
+From: Mihai Maruseac <mihai.maruseac@gmail.com>
+Date: Sat, 5 Apr 2025 19:05:04 -0700
+Subject: [PATCH 2/2] Update
+ tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
+
+---
+ .../compiler/mlir/lite/transforms/default_quant_params.cc     | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc b/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
+index 7acbb7d17240b8a0e25dcb03aabc4d0153907530..995a878cfc47cfcb518d8259b8e6b32da50a2b34 100644
+--- a/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
++++ b/tensorflow/compiler/mlir/lite/transforms/default_quant_params.cc
+@@ -54,9 +54,7 @@ namespace {
+ class DefaultQuantParamsPass
+     : public impl::DefaultQuantParamsPassBase<DefaultQuantParamsPass> {
+  public:
+-  DefaultQuantParamsPass()
+-  {
+-  }
++  DefaultQuantParamsPass() {}
+ 
+   explicit DefaultQuantParamsPass(double default_min, double default_max,
+                                   bool is_signed) {

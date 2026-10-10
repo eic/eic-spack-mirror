@@ -1,0 +1,143 @@
+From d4435369043bbd45a30c10a3ee25e1d4df316b5f Mon Sep 17 00:00:00 2001
+From: Andrei Gheata <Andrei.Gheata@cern.ch>
+Date: Tue, 2 Jun 2026 16:26:54 +0200
+Subject: [PATCH] [geom] Fix tessellated closure checks after initialization
+
+TGeoTessellated::CloseShape(false) initializes the bounding box, BVH and normals, then marks the shape closed for initialization purposes. Since the BVH navigation change added an unconditional fast return for already-initialized shapes, a later explicit CloseShape(true) could no longer run CheckClosure(). This left GDML-imported tessellated solids stuck with fClosedBody=false because TGDMLParse finalizes them with CloseShape(false).
+
+Allow the fast path only for repeated unchecked closes. A checked close now reuses the existing initialization data but still runs facet and closure validation, so fClosedBody can be updated without rebuilding the BVH. Also refresh cached normals if CheckClosure fixes flipped facets.
+
+Add a regression test for the unchecked-close followed by checked-close sequence using the closed tetrahedron from the issue reproducer.
+---
+ geom/geom/src/TGeoTessellated.cxx | 51 +++++++++++++++----------------
+ geom/test/test_tessellated.cxx    | 31 +++++++++++++++++++
+ 2 files changed, 56 insertions(+), 26 deletions(-)
+
+diff --git a/geom/geom/src/TGeoTessellated.cxx b/geom/geom/src/TGeoTessellated.cxx
+index dd6e2611a3cff207d478db8efbad844c3492501e..29f195709028d0a6e06e65befc804ddc7f88eff7 100644
+--- a/geom/geom/src/TGeoTessellated.cxx
++++ b/geom/geom/src/TGeoTessellated.cxx
+@@ -328,38 +328,36 @@ bool TGeoTessellated::FacetCheck(int ifacet) const
+ 
+ void TGeoTessellated::CloseShape(bool check, bool fixFlipped, bool verbose)
+ {
+-   if (fIsClosed && fBVH) {
++   const bool initialized = fIsClosed && fBVH;
++   if (initialized && !check) {
+       return;
+    }
+-   // Compute bounding box
+-   fDefined = true;
+-   fNvert = fVertices.size();
+-   fNfacets = fFacets.size();
+-   ComputeBBox();
+ 
+-   BuildBVH();
+-   if (fOutwardNormals.size() == 0) {
+-      CalculateNormals();
+-   } else {
+-      // short check if the normal container is of correct size
+-      if (fOutwardNormals.size() != fFacets.size()) {
+-         std::cerr << "Inconsistency in normal container";
+-      }
+-   }
+-   fIsClosed = true;
++   if (!initialized) {
++      // Compute bounding box
++      fDefined = true;
++      fNvert = fVertices.size();
++      fNfacets = fFacets.size();
++      ComputeBBox();
+ 
+-   // Cleanup the vertex map
+-   std::multimap<long, int>().swap(fVerticesMap);
++      BuildBVH();
++      fIsClosed = true;
++
++      // Cleanup the vertex map
++      std::multimap<long, int>().swap(fVerticesMap);
++   }
+ 
+    if (fVertices.size() > 0) {
+-      if (!check)
+-         return;
++      if (check) {
++         // Check facets
++         for (auto i = 0; i < fNfacets; ++i)
++            FacetCheck(i);
+ 
+-      // Check facets
+-      for (auto i = 0; i < fNfacets; ++i)
+-         FacetCheck(i);
++         fClosedBody = CheckClosure(fixFlipped, verbose);
++      }
+ 
+-      fClosedBody = CheckClosure(fixFlipped, verbose);
++      if (fOutwardNormals.size() != fFacets.size())
++         CalculateNormals();
+    }
+ }
+ 
+@@ -422,6 +420,8 @@ bool TGeoTessellated::CheckClosure(bool fixFlipped, bool verbose)
+       }
+       if (nfixed && verbose)
+          Info("Check", "Automatically flipped %d facets to match first defined facet", nfixed);
++      if (nfixed && !fOutwardNormals.empty())
++         CalculateNormals();
+    }
+    delete[] nn;
+    delete[] flipped;
+@@ -1277,8 +1277,7 @@ inline Double_t TGeoTessellated::SafetyKernel(const Double_t *point, bool in, in
+             const auto object_id = mybvh->prim_ids[p_id];
+ 
+             const auto &facet = fFacets[object_id];
+-            auto thissafetySQ =
+-               pointFacetDistSq(Vec3f<float>(point[0], point[1], point[2]), facet, fVertices);
++            auto thissafetySQ = pointFacetDistSq(Vec3f<float>(point[0], point[1], point[2]), facet, fVertices);
+ 
+             if (thissafetySQ < smallest_safety_sq) {
+                smallest_safety_sq = thissafetySQ;
+diff --git a/geom/test/test_tessellated.cxx b/geom/test/test_tessellated.cxx
+index bd67f8d5c3c59f94de8192f203c081572d8c8f25..a4d6c40b4e6461029a007845af183ca0af8dbc5c 100644
+--- a/geom/test/test_tessellated.cxx
++++ b/geom/test/test_tessellated.cxx
+@@ -96,8 +96,39 @@ CreateTrdLikeTessellated_Triangles(const char *name, double x1, double x2, doubl
+    return tsl;
+ }
+ 
++void AddClosedTetrahedronFacets(TGeoTessellated &tsl)
++{
++   // Closed tetrahedron using the same facet winding as the GDML reproducer
++   // for ROOT issue #22395.
++   const Vtx v0(0, 0, 0);
++   const Vtx v1(10, 0, 0);
++   const Vtx v2(5, 10, 0);
++   const Vtx v3(5, 5, 10);
++
++   EXPECT_TRUE(tsl.AddFacet(v0, v2, v1));
++   EXPECT_TRUE(tsl.AddFacet(v0, v1, v3));
++   EXPECT_TRUE(tsl.AddFacet(v1, v2, v3));
++   EXPECT_TRUE(tsl.AddFacet(v0, v3, v2));
++}
++
+ } // namespace
+ 
++TEST(TGeoTessellated, CloseShapeCanCheckAfterUncheckedClose)
++{
++   // TGDMLParse finalizes tessellated solids with CloseShape(false). This must
++   // initialize the shape without preventing a later explicit CloseShape(true)
++   // from running closure validation and setting the closed-body state.
++   TGeoTessellated tsl("Closed Tetrahedron");
++   AddClosedTetrahedronFacets(tsl);
++
++   tsl.CloseShape(/*check=*/false);
++   EXPECT_TRUE(tsl.IsDefined());
++   EXPECT_FALSE(tsl.IsClosedBody());
++
++   tsl.CloseShape(/*check=*/true, /*fixFlipped=*/true, /*verbose=*/false);
++   EXPECT_TRUE(tsl.IsClosedBody());
++}
++
+ TEST(TGeoTessellated, TrdLike_CoreNavigation)
+ {
+    // Representative points (ported)

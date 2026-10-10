@@ -1,0 +1,25 @@
+From 988961b7172b8f1ad7d89450cd8cddd4413e1564 Mon Sep 17 00:00:00 2001
+From: Juan Miguel Carceller <22276694+jmcarcell@users.noreply.github.com>
+Date: Fri, 19 Jun 2026 10:07:55 +0200
+Subject: [PATCH] Fix compilation with fmt 12.2.0 by including a missing
+ fmt/ranges.h (#977)
+
+---
+ tools/src/tabulate.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tools/src/tabulate.h b/tools/src/tabulate.h
+index cc2fd9609b5334cd1a56d84a85602cf387ba9b14..656841cda5e0d43a53f6d52593b141e3cfac7ca9 100644
+--- a/tools/src/tabulate.h
++++ b/tools/src/tabulate.h
+@@ -2,9 +2,9 @@
+ #define PODIO_TOOLS_TABULATE_H // NOLINT(llvm-header-guard): folder structure not suitable
+ 
+ #include <fmt/core.h>
++#include <fmt/ranges.h>
+ 
+ #include <algorithm>
+-#include <iostream>
+ #include <iterator>
+ #include <string>
+ #include <tuple>

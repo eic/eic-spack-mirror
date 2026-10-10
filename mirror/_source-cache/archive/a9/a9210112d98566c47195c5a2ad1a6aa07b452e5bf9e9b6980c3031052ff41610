@@ -1,0 +1,13 @@
+diff --git a/python/src/rootIO/__init__.py b/python/src/rootIO/__init__.py
+index b05805d75f022ebcb7aa7202889422ee38f01a55..709d8bd8497e6c13a32c59b482e3750cd17e04b0 100644
+--- a/python/src/rootIO/__init__.py
++++ b/python/src/rootIO/__init__.py
+@@ -1,8 +1 @@
+-try:
+- import platform
+- if platform.system() != 'Darwin':
+-   from ctypes import cdll
+-   libCore = cdll.LoadLibrary("libCore.so")
+-except:
+-  print("An exception occurred while loading libCore.so with ctypes")
+ from .pyHepMC3rootIO import *

@@ -1,0 +1,49 @@
+From fc87fa796f8dd8b520760613a52a1923dc4c9a63 Mon Sep 17 00:00:00 2001
+From: Vincenzo Eduardo Padulano <vincenzo.eduardo.padulano@cern.ch>
+Date: Mon, 25 May 2026 07:23:56 +0200
+Subject: [PATCH] [python] Ensure GIL is held during CPython API call
+
+ROOT's CPython extension defines a custom error handler that tries to use Python standard warnings when possible. In such cases, the CPython API is called and thus the GIL must be held. If the calling Python function had previously released the GIL it will result in trouble. This is the case for the TH1.Fit method which has been changed to always releasing the GIL, under the assumption that everything happening during the call happens in C++, but that's not true. This commit proposes to restore the GIL for the call to the CPython API to raise the warning.
+---
+ .../pythonizations/src/RPyROOTApplication.cxx      |  2 ++
+ bindings/pyroot/pythonizations/test/th1.py         | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/bindings/pyroot/pythonizations/src/RPyROOTApplication.cxx b/bindings/pyroot/pythonizations/src/RPyROOTApplication.cxx
+index 2808b2856f47df99f3d9b3d41d381150872d8d07..67f11364399e31669f8ba65899f4699b7640bf26 100644
+--- a/bindings/pyroot/pythonizations/src/RPyROOTApplication.cxx
++++ b/bindings/pyroot/pythonizations/src/RPyROOTApplication.cxx
+@@ -122,7 +122,9 @@ static void ErrMsgHandler(int level, Bool_t abort, const char *location, const c
+       // the GIL.
+       if (!gGlobalMutex) {
+          // Either printout or raise exception, depending on user settings
++         auto state = PyGILState_Ensure();
+          PyErr_WarnExplicit(NULL, (char *)msg, (char *)location, 0, (char *)"ROOT", NULL);
++         PyGILState_Release(state);
+       } else {
+          ::DefaultErrorHandler(level, abort, location, msg);
+       }
+diff --git a/bindings/pyroot/pythonizations/test/th1.py b/bindings/pyroot/pythonizations/test/th1.py
+index 5dd7f32e9036751cff3078bcaab0b3d35da53a81..6d7332e5c0d0b141db9b5a0cab8a1983ef991132 100644
+--- a/bindings/pyroot/pythonizations/test/th1.py
++++ b/bindings/pyroot/pythonizations/test/th1.py
+@@ -66,5 +66,19 @@ def func(x, pars):
+         self.assertGreater(r.Parameter(0), 0)
+ 
+ 
++class TH1FitWarning(unittest.TestCase):
++    def test_fit_with_warning(self):
++        """
++        Regression test for https://github.com/root-project/root/issues/22396
++        """
++        import ROOT
++
++        h = ROOT.TH1D("test", "test", 100, 0, 1)
++        # Trying to fit a empty histogram will result in a warning on the C++ side which is re-raised as a Python
++        # warning by the ROOT CPython extension
++        with self.assertWarns(RuntimeWarning, msg="Fit data is empty"):
++            h.Fit("gaus", "S")
++
++
+ if __name__ == "__main__":
+     unittest.main()

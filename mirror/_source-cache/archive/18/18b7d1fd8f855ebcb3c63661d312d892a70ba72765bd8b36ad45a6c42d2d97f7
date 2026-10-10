@@ -1,0 +1,93 @@
+From 490fd69174a6241b5e532f346dbc1d05b830419f Mon Sep 17 00:00:00 2001
+From: Wouter Deconinck <wdconinc@gmail.com>
+Date: Fri, 22 May 2026 14:46:59 -0500
+Subject: [PATCH] fix: add LinkDef.h for janaview and data model example
+ plugins
+
+In ROOT v6.40.00, a LinkDef.h is required (or a C++ module) [1],
+and this commit adds a minimal LinkDef.h for the janaview and
+ROOT data model example plugins where it was missing.
+
+[1] https://github.com/root-project/root/commit/d3b89850ce6
+---
+ src/examples/misc/RootDatamodelExample/CMakeLists.txt    | 2 +-
+ src/examples/misc/RootDatamodelExample/Cluster_LinkDef.h | 9 +++++++++
+ src/examples/misc/RootDatamodelExample/Hit_LinkDef.h     | 9 +++++++++
+ src/plugins/janaview/CMakeLists.txt                      | 2 +-
+ src/plugins/janaview/jv_mainframe_LinkDef.h              | 9 +++++++++
+ 5 files changed, 29 insertions(+), 2 deletions(-)
+ create mode 100644 src/examples/misc/RootDatamodelExample/Cluster_LinkDef.h
+ create mode 100644 src/examples/misc/RootDatamodelExample/Hit_LinkDef.h
+ create mode 100644 src/plugins/janaview/jv_mainframe_LinkDef.h
+
+diff --git a/src/examples/misc/RootDatamodelExample/CMakeLists.txt b/src/examples/misc/RootDatamodelExample/CMakeLists.txt
+index 589ff9cf0fa993d7409fdde6bf5140e9f96db432..7dd974de0e52a337b32a03b27cc1e6a8b83e83ac 100644
+--- a/src/examples/misc/RootDatamodelExample/CMakeLists.txt
++++ b/src/examples/misc/RootDatamodelExample/CMakeLists.txt
+@@ -14,7 +14,7 @@ if(${USE_ROOT})
+ 	include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+     set(my_pcms)
+     foreach( CLASS Hit Cluster )
+-        ROOT_GENERATE_DICTIONARY(G__${CLASS} ${CLASS}.h)
++        ROOT_GENERATE_DICTIONARY(G__${CLASS} ${CLASS}.h LINKDEF ${CLASS}_LinkDef.h)
+         list(APPEND my_pcms ${CMAKE_CURRENT_BINARY_DIR}/lib${CLASS}_rdict.pcm )
+     endforeach()
+ 
+diff --git a/src/examples/misc/RootDatamodelExample/Cluster_LinkDef.h b/src/examples/misc/RootDatamodelExample/Cluster_LinkDef.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ec25282b4e33aff1f17f20808488e8df3114d3e
+--- /dev/null
++++ b/src/examples/misc/RootDatamodelExample/Cluster_LinkDef.h
+@@ -0,0 +1,9 @@
++#ifdef __CINT__
++
++#pragma link off all globals;
++#pragma link off all classes;
++#pragma link off all functions;
++
++#pragma link C++ class Cluster+;
++
++#endif
+diff --git a/src/examples/misc/RootDatamodelExample/Hit_LinkDef.h b/src/examples/misc/RootDatamodelExample/Hit_LinkDef.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b08a37843c001c1f897ebc802d77ce73783f465
+--- /dev/null
++++ b/src/examples/misc/RootDatamodelExample/Hit_LinkDef.h
+@@ -0,0 +1,9 @@
++#ifdef __CINT__
++
++#pragma link off all globals;
++#pragma link off all classes;
++#pragma link off all functions;
++
++#pragma link C++ class Hit+;
++
++#endif
+diff --git a/src/plugins/janaview/CMakeLists.txt b/src/plugins/janaview/CMakeLists.txt
+index 5a1c5943a431dd1235eae9a4779848aff8827652..9bc7ae051a9ea32ea1026c50f33ccbbd1a8046e9 100644
+--- a/src/plugins/janaview/CMakeLists.txt
++++ b/src/plugins/janaview/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ if(USE_ROOT)
+ 
+     find_package(ROOT REQUIRED COMPONENTS Gui Core RIO Net Hist Graf Graf3d Gpad Tree Rint Postscript Matrix Physics MathCore Thread MultiProc)
+-    ROOT_GENERATE_DICTIONARY(G__jv_mainframe jv_mainframe.h)
++    ROOT_GENERATE_DICTIONARY(G__jv_mainframe jv_mainframe.h LINKDEF jv_mainframe_LinkDef.h)
+ 
+     file(GLOB JANAVIEW_HEADERS "*.h*")
+ 
+diff --git a/src/plugins/janaview/jv_mainframe_LinkDef.h b/src/plugins/janaview/jv_mainframe_LinkDef.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..c58d4a438cafdc1a0837749b670f963c4288b215
+--- /dev/null
++++ b/src/plugins/janaview/jv_mainframe_LinkDef.h
+@@ -0,0 +1,9 @@
++#ifdef __CINT__
++
++#pragma link off all globals;
++#pragma link off all classes;
++#pragma link off all functions;
++
++#pragma link C++ class jv_mainframe+;
++
++#endif

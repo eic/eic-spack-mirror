@@ -1,0 +1,27 @@
+From 75395b7166ad0b03f5c1417e9ce924aa82a2589c Mon Sep 17 00:00:00 2001
+From: "A. Unique TensorFlower" <gardener@tensorflow.org>
+Date: Mon, 5 Oct 2026 15:34:32 -0700
+Subject: [PATCH] Stop passing `CC_OPT_FLAGS` to `--host_copt` in
+ `configure.py`.
+
+Passing `CC_OPT_FLAGS` (such as `-mcpu=apple-m1` on Apple Silicon) to `--host_copt` causes Bazel to forward target-specific CPU flags to all `exec` configurations, including `darwin_x86_64-opt-exec` host tool targets, which fails with `error: unknown target CPU 'apple-m1'`. Only write `CC_OPT_FLAGS` to `build:opt --copt`, matching XLA's `configure.py`.
+
+Fixes #111876
+
+PiperOrigin-RevId: 993943608
+---
+ configure.py | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/configure.py b/configure.py
+index ffcfb82a519b0bfb1e4b02f2bdc50d0aba66dfbe..848253d83679f638455ee1be773d9b79e1101c35 100644
+--- a/configure.py
++++ b/configure.py
+@@ -472,7 +472,6 @@ def set_cc_opt_flags(environ_cp):
+                                                  question, default_cc_opt_flags)
+   for opt in cc_opt_flags.split():
+     write_to_bazelrc('build:opt --copt=%s' % opt)
+-    write_to_bazelrc('build:opt --host_copt=%s' % opt)
+ 
+ 
+ def set_tf_cuda_clang(environ_cp):
