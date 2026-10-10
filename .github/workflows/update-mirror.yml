@@ -35,6 +35,13 @@ jobs:
           spack_ref: develop
           packages_ref: develop
 
+      - name: Checkout key4hep-spack repository
+        uses: actions/checkout@v7
+        with:
+          repository: key4hep/key4hep-spack
+          ref: main
+          path: key4hep-spack
+
       - name: Checkout eic-spack repository
         uses: actions/checkout@v7
         with:
@@ -42,9 +49,12 @@ jobs:
           ref: develop
           path: eic-spack
 
-      - name: Add eic-spack package repository
+      # eic-spack packages such as k4fwcore and k4actstracking extend packages from key4hep-spack.
+      # Repositories added later take precedence, so eic-spack goes last.
+      - name: Add key4hep-spack and eic-spack package repositories
         shell: bash
         run: |
+          spack repo add "$GITHUB_WORKSPACE/key4hep-spack"
           spack repo add "$GITHUB_WORKSPACE/eic-spack/spack_repo/eic"
 
       - name: Allow deprecated packages
@@ -65,6 +75,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p mirror
+
+          # Packages that are not mirrored, with the reason. The "Remove large files from mirror"
+          # step warns about packages whose files exceed the size limit, so they can be added here.
+          skip_packages=(
+            fluka  # manual download behind a login, not publicly fetchable
+          )
 
           mapfile -t packages < <(
             find "$GITHUB_WORKSPACE/eic-spack" -type f -path '*/packages/*/package.py' \
@@ -117,8 +133,20 @@ jobs:
             return "$rc"
           }
 
+          is_skipped() {
+            local skipped
+            for skipped in "${skip_packages[@]}"; do
+              [ "$skipped" = "$1" ] && return 0
+            done
+            return 1
+          }
+
           failed_packages=()
           for pkg in "${packages[@]}"; do
+            if is_skipped "$pkg"; then
+              echo "Skipping ${pkg}, in the skip list"
+              continue
+            fi
             echo "Mirroring ${pkg}"
             if ! mirror_by_version "$pkg"; then
               echo "Failed to mirror ${pkg}"
@@ -137,20 +165,43 @@ jobs:
           set -euo pipefail
           # Find and remove files larger than 50MB to comply with GitHub's recommendations
           echo "Searching for files larger than 50MB..."
+
+          # Map the resolved path of each mirrored file to its package, since large files live in
+          # mirror/_source-cache and are linked from mirror/<package>/
+          declare -A link_package=()
+          while IFS= read -r -d '' link; do
+            link_package["$(realpath -- "$link")"]=$(basename "$(dirname "$link")")
+          done < <(find mirror -mindepth 2 -type l -not -path 'mirror/_source-cache/*' -print0)
+
           large_files_found=0
+          declare -A large_packages=()
           while IFS= read -r -d '' file; do
             if [ "$large_files_found" -eq 0 ]; then
               echo "Found large files that exceed GitHub's 50MB recommendation:"
               large_files_found=1
             fi
             size=$(du -h -- "$file" | cut -f1)
-            echo "  - $file ($size)"
+            package=${link_package["$(realpath -- "$file")"]:-}
+            if [ -z "$package" ]; then
+              case "$file" in
+                mirror/_source-cache/*) package="" ;;
+                *) package=$(echo "$file" | cut -d/ -f2) ;;
+              esac
+            fi
+            echo "  - $file ($size)${package:+ [package: $package]}"
+            [ -z "$package" ] || large_packages["$package"]=1
           done < <(find mirror -type f -size +50M -print0 2>/dev/null)
 
           if [ "$large_files_found" -eq 1 ]; then
             echo "Removing large files..."
             find mirror -type f -size +50M -print0 2>/dev/null | xargs -0 rm --
             echo "Large files removed successfully"
+            if [ "${#large_packages[@]}" -ne 0 ]; then
+              removed=$(printf '%s\n' "${!large_packages[@]}" | sort | tr '\n' ' ')
+              echo "::warning title=Large files removed from mirror::Removed files over 50MB for packages: ${removed}- consider adding them to skip_packages in the mirror step"
+            else
+              echo "::warning title=Large files removed from mirror::Removed files over 50MB that could not be matched to a package"
+            fi
           else
             echo "No files larger than 50MB found"
           fi
