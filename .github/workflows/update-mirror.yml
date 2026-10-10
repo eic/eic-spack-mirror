@@ -47,6 +47,19 @@ jobs:
         run: |
           spack repo add "$GITHUB_WORKSPACE/eic-spack/spack_repo/eic"
 
+      - name: Allow deprecated packages
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/deprecation.yaml" <<'EOF'
+          packages:
+            all:
+              deprecation:
+                allow:
+                - severity: critical
+          EOF
+          spack config add -f "$RUNNER_TEMP/deprecation.yaml"
+          spack config add "config:deprecated:true"
+
       - name: Create mirror entries for eic-spack packages
         shell: bash
         run: |
