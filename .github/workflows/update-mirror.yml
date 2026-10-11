@@ -80,6 +80,12 @@ jobs:
           # step warns about packages whose files exceed the size limit, so they can be added here.
           skip_packages=(
             fluka  # manual download behind a login, not publicly fetchable
+            eicroot  # source archive over 50MB (196M)
+            ejana  # source archives over 50MB (54M)
+            py-tensorflow  # source archive over 50MB (81M); rocm-enhanced versions need +rocm
+            pyrobird  # source archive over 50MB (74M)
+            root  # source archives over 50MB (328M)
+            tensorflow-lite  # source archives over 50MB (63-64M)
           )
 
           mapfile -t packages < <(
